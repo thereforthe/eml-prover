@@ -147,8 +147,13 @@ if api_key:
                     clean_code = clean_code.replace('```python', '').replace('```', '').replace('`', '').strip()
                     clean_code = clean_code.replace('，', ',').replace('（', '(').replace('）', ')')
                     clean_code = clean_code.replace('^', '**')
-                    if clean_code.lower().startswith('python'): clean_code = clean_code[6:].strip()
 
+                    # 👇 新增这两行，专治 AI 自作聪明调用库 👇
+                    clean_code = clean_code.replace('math.log', 'ln').replace('np.log', 'ln')
+                    clean_code = clean_code.replace('math.exp', 'exp').replace('np.exp', 'exp')
+
+                    if clean_code.lower().startswith('python'): clean_code = clean_code[6:].strip()
+                    
                     # 🔍 增加了一个“透视镜”，让你看到清洗后的代码
                     st.info(f"🔍 AI 编译出的表达式: `{clean_code}`")
 
