@@ -60,18 +60,28 @@ class Mul(Expr):
             f"乘法法则(Leibniz): $d({self.left} \\cdot {self.right}) = ({ld})({self.right}) + ({self.left})({rd})$"][
             span_12](end_span)
 
+
 class Pow(Expr):
     def __init__(self, left, right):
-        self.left, self.right = left, right
+        self.left = left
+        self.right = right
+
     def deriv(self, var):
+        # 目前仅支持常数幂求导，例如 x^2
         if isinstance(self.right, Const):
             n = self.right.val
+            # 1. 递归求底数的导数
             ld, ls = self.left.deriv(var)
-            res = Const(n) * (self.left ** Const(n-1)) * ld
-            return res, ls + [f"幂链式法则: $d(u^{{{n}}}) = {n}u^{{{n-1}}} \\cdot du$"]
+            # 2. 应用幂法则：n * u^(n-1) * u'
+            res = Const(n) * (self.left ** Const(n - 1)) * ld
+            # 3. 必须返回结果对象和步骤列表，否则会报 NoneType 错误
+            return res, ls + [f"幂链式法则: $d(u^{{{n}}}) = {n}u^{{{n - 1}}} \\cdot du$"]
+
         return Const(0), ["目前仅支持常数幂求导"]
+
     def eval(self, env):
         return self.left.eval(env) ** self.right.eval(env)
+
     def __str__(self):
         return f"({self.left})^{{{self.right}}}"
 
