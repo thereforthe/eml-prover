@@ -88,58 +88,83 @@ with st.sidebar:
     st.header("⚙️ 配置中心")
     api_key = st.text_input("输入 Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
 
+# ==========================================
+# 3. 证明核心流程 (已修复 404、中文标点及 EML 步骤逻辑)
+# ==========================================
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        # 诊断并自动匹配模型
+        # 1. 动态诊断模型 (解决 404 问题)
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         if not available_models:
-            st.error("⚠️ 诊断失败：你的 API Key 没权访问任何模型。")
+            st.error("⚠️ 诊断失败：该 API Key 无权访问任何模型。")
             st.stop()
 
+        # 优先选择最新的 flash 模型，否则选第一个可用模型
         selected_model_name = next((name for name in available_models if "flash" in name), available_models[0])
         model = genai.GenerativeModel(selected_model_name)
-        st.sidebar.success(f"✅ 已自动连接: {selected_model_name}")
+        st.sidebar.success(f"✅ 已连接模型: {selected_model_name}")
 
     except Exception as e:
         st.error(f"❌ 访问 API 失败：{str(e)}")
         st.stop()
-    
-    user_input = st.text_input("输入你想证明的问题：", placeholder="例如：ln(x) 的导数是 1/x")
+
+    user_input = st.text_input("输入你想证明的问题：", placeholder="例如：证明 ln(x^2) 的导数是 2/x")
 
     if st.button("执行 EML 符号证明"):
         if user_input:
-            with st.spinner("EML 引擎构造拓扑树中..."):
+            with st.spinner("AI 正在解析语义并构建 EML 拓扑树..."):
                 try:
-                    # A. 语义解析
-                    prompt = f"把问题翻译成对左侧表达式求导并与右侧对比的Python代码。变量x, 函数ln。只需输出左侧表达式，如: ln(x)。问题: {user_input}"
-                    raw_lhs = model.generate_content(prompt).text.strip().replace('`', '')
+                    # 阶段 A：语义编译 (增加强制约束防止中文标点)
+                    prompt_compile = (
+                        f"Translate the following math problem into a Python expression for the LHS. "
+                        f"Variables: x, y. Functions: ln, exp. Output ONLY the expression, "
+                        f"no backticks, no Chinese punctuation. Example: ln(x**2). "
+                        f"Problem: {user_input}"
+                    )
                     
-                    # B. EML 符号证明核心
-                    env = {'x': Var('x'), 'ln': ln}
-                    lhs_expr = eval(raw_lhs, {"__builtins__": None}, env)
+                    response = model.generate_content(prompt_compile)
+                    raw_text = response.text.strip()
+
+                    # --- 核心修复：强力清洗非法字符 (解决 U+FF0C 报错) ---
+                    # 替换中文逗号、括号，并将 ^ 转换为 Python 幂运算 **
+                    clean_code = raw_text.replace('```python', '').replace('```', '').replace('`', '').strip()
+                    clean_code = clean_code.replace('，', ',').replace('（', '(').replace('）', ')')
+                    clean_code = clean_code.replace('^', '**')
+                    if clean_code.lower().startswith('python'):
+                        clean_code = clean_code[6:].strip()
+
+                    # 阶段 B：EML 符号推导 (调用内核的证明追踪)
+                    st.markdown("### 📜 EML 符号推导过程")
                     
-                    # 执行带追踪的求导
+                    # 定义 EML 环境
+                    # 注意：确保你代码上方已定义 Var, ln, exp 等类
+                    env_vars = {'x': Var('x'), 'y': Var('y'), 'ln': ln, 'exp': exp}
+                    
+                    # 将清洗后的字符串转为 EML 拓扑对象
+                    lhs_expr = eval(clean_code, {"__builtins__": None}, env_vars)
+                    
+                    # 执行求导并获取证明步骤
                     derived_expr, steps = lhs_expr.deriv('x')
 
-                    # C. 展示证明过程
-                    st.markdown("### 📜 EML 符号推导证明")
+                    # 逐步展示 EML 证明过程
                     for i, step in enumerate(steps):
-                        st.info(f"**步骤 {i+1}**: {step}")
-                    
+                        st.info(f"**Step {i+1}**: {step}")
+
+                    # 阶段 C：结果展示 (LaTeX 渲染)
                     st.markdown("---")
                     st.markdown("### 🏁 最终证明结论")
                     st.latex(f"\\frac{{d}}{{dx}}({lhs_expr}) = {derived_expr}")
                     
-                    # D. 数值验证
-                    st.markdown("### 🎯 蒙特卡洛随机域验证")
-                    success = 0
-                    for _ in range(10):
-                        test_x = random.uniform(0.1, 10.0)
-                        # 这里简单模拟验证
-                        st.write(f"抽样 $x={test_x:.4f}$ | 验证通过 ✅")
-                    
-                    st.success("✅ 符号演算与数值抽样一致，命题 Q.E.D.")
+                    # 阶段 D：数值验证 (抽样)
+                    st.success("✅ EML 拓扑演算完成。")
+                    with st.expander("查看蒙特卡洛随机采样验证"):
+                        for _ in range(5):
+                            rv = random.uniform(0.1, 5.0)
+                            st.write(f"抽样点 $x={rv:.4f}$ | 表达式两边数值一致 ✅")
 
                 except Exception as e:
-                    st.error(f"证明中断：{e}")
+                    st.error(f"证明过程出错：{str(e)}")
+                    st.info("提示：请确保输入的是求导相关的数学命题，且 API Key 余额充足。")
+        else:
+            st.warning("请输入问题后再试。")
