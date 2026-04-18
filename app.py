@@ -119,7 +119,7 @@ class Div(Expr):
 
     def __str__(self):
         return f"\\frac{{{self.left}}}{{{self.right}}}"
-
+def ln(x): return Ln(_to_expr(x))
 # ==========================================
 # 2. UI 界面设计
 # ==========================================
