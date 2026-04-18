@@ -90,7 +90,20 @@ with st.sidebar:
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        # 诊断并自动匹配模型
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        if not available_models:
+            st.error("⚠️ 诊断失败：你的 API Key 没权访问任何模型。")
+            st.stop()
+
+        selected_model_name = next((name for name in available_models if "flash" in name), available_models[0])
+        model = genai.GenerativeModel(selected_model_name)
+        st.sidebar.success(f"✅ 已自动连接: {selected_model_name}")
+
+    except Exception as e:
+        st.error(f"❌ 访问 API 失败：{str(e)}")
+        st.stop()
     
     user_input = st.text_input("输入你想证明的问题：", placeholder="例如：ln(x) 的导数是 1/x")
 
