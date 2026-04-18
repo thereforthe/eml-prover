@@ -150,7 +150,7 @@ if api_key:
         if user_input:
             with st.spinner("AI 正在解析语义并构建 EML 拓扑树..."):
                 try:
-                    # A: 语义编译 (只要需要求导的原函数表达式)
+                    # A: 语义编译 (小样本提示，精准提取)
                     prompt = f"""
                     You are a strict math parser. Extract ONLY the mathematical expression that needs to be differentiated from the user's problem.
                     Do NOT output the expected result, the equation, or any Chinese characters. 
@@ -165,24 +165,44 @@ if api_key:
                     Output ONLY the python expression:
                     """
 
-                    # B: 符号推导
+                    # 获取 AI 的原始输出
+                    raw_text = model.generate_content(prompt).text.strip()
+
+                    # B: 强力清洗层 (修复正则表达式语法错误)
+                    clean_code = re.sub(r'span_\d+', '', raw_text)
+                    clean_code = re.sub(r"'", '', clean_code)  # 修复：正确去除单引号
+                    clean_code = clean_code.replace('```python', '').replace('```', '').replace('`', '').strip()
+                    clean_code = clean_code.replace('，', ',').replace('（', '(').replace('）', ')')
+                    clean_code = clean_code.replace('^', '**')
+                    # 拦截并替换自作聪明的 math 库调用
+                    clean_code = clean_code.replace('math.log', 'ln').replace('np.log', 'ln')
+                    clean_code = clean_code.replace('math.exp', 'exp').replace('np.exp', 'exp')
+                    if clean_code.lower().startswith('python'): clean_code = clean_code[6:].strip()
+
+                    # C: 透视镜输出
+                    st.info(f"🔍 AI 编译出的表达式: `{clean_code}`")
+
+                    # D: EML 符号推导核心
                     env_vars = {'x': Var('x'), 'y': Var('y'), 'ln': ln, 'exp': exp}
 
-                    # 执行符号转换
+                    # 将字符串转为 EML 对象
                     lhs_expr = eval(clean_code, {"__builtins__": {}}, env_vars)
 
+                    # 执行求导！
                     derived_expr, steps = lhs_expr.deriv('x')
 
+                    # 渲染证明步骤
                     st.markdown("### 📜 EML 符号推导过程")
                     for i, step in enumerate(steps):
                         st.success(f"**Step {i + 1}**: {step}")
 
+                    # 渲染最终结论 LaTeX
                     st.markdown("---")
                     st.markdown("### 🏁 最终证明结论")
                     st.latex(f"\\frac{{d}}{{dx}}({lhs_expr}) = {derived_expr}")
 
                 except Exception as e:
-                    # 如果再报错，这里会打印出真正的元凶（比如 NameError 或 SyntaxError）
+                    # 兜底报错，显示真凶
                     st.error(f"证明出错：{type(e).__name__} - {str(e)}")
         else:
             st.warning("请输入问题后再试。")
