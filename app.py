@@ -56,6 +56,17 @@ class Mul(Expr):
     def eval(self, env): return self.left.eval(env) * self.right.eval(env)
     def __str__(self): return f"({self.left} \\cdot {self.right})"
 
+class Exp(Expr):
+    def __init__(self, inner): self.inner = inner
+    def deriv(self, var):
+        id, is_ = self.inner.deriv(var)
+        res = exp(self.inner) * id
+        return res, is_ + [f"指数规则: $d(e^{{{self.inner}}}) = e^{{{self.inner}}} \\cdot d({self.inner})$"]
+    def eval(self, env): return math.exp(self.inner.eval(env))
+    def __str__(self): return f"e^{{{self.inner}}}"
+# 对应的辅助函数
+def exp(x): return Exp(_to_expr(x))
+
 class Ln(Expr):
     def __init__(self, inner): self.inner = inner
     def deriv(self, var):
