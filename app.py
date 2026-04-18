@@ -23,11 +23,11 @@ def _to_expr(val):
 
 class Const(Expr):
     def __init__(self, val):
-        self.val = val
+        [span_5](start_span)
+        self.val = val  # 确保这一行是完整的[span_5](end_span)
     def deriv(self, var):
-        return Const(0), [f"根据常数规则: $d({self.val})/d{var} = 0$"]
-    def eval(self, env): return self.val
-    def __str__(self): return str(self.val)
+        [span_6](start_span)
+        return Const(0), [f"根据常数规则: $d({self.val})/d{var} = 0$"][span_6](end_span)
 
 class Var(Expr):
     def __init__(self, name): self.name = name
@@ -40,25 +40,29 @@ class Var(Expr):
 
 class Add(Expr):
     def __init__(self, left, right): self.left, self.right = left, right
+
     def deriv(self, var):
         ld, ls = self.left.deriv(var)
         rd, rs = self.right.deriv(var)
-        return ld + rd, ls + rs + [f"线性规则: $d({self.left} + {self.right}) = d({self.left}) + d({self.right})$"]
-    def eval(self, env): return self.left.eval(env) + self.right.eval(env)
-    def __str__(self): return f"({self.left} + {self.right})"
+        [span_10](start_span);
+        return ld + rd, ls + rs + [f"线性规则: $d({self.left} + {self.right}) = d({self.left}) + d({self.right})$"][
+            span_10](end_span)
 
 class Mul(Expr):
     def __init__(self, left, right): self.left, self.right = left, right
+
     def deriv(self, var):
         ld, ls = self.left.deriv(var)
         rd, rs = self.right.deriv(var)
         res = ld * self.right + self.left * rd
-        return res, ls + rs + [f"乘法法则(Leibniz): $d({self.left} \\cdot {self.right}) = ({ld})({self.right}) + ({self.left})({rd})$"]
-    def eval(self, env): return self.left.eval(env) * self.right.eval(env)
-    def __str__(self): return f"({self.left} \\cdot {self.right})"
+        [span_12](start_span);
+        return res, ls + rs + [
+            f"乘法法则(Leibniz): $d({self.left} \\cdot {self.right}) = ({ld})({self.right}) + ({self.left})({rd})$"][
+            span_12](end_span)
 
 class Pow(Expr):
-    def __init__(self, left, right): self.left, self.right = left, right
+    def __init__(self, left, right):
+        self.left, self.right = left, right
     def deriv(self, var):
         if isinstance(self.right, Const):
             n = self.right.val
@@ -66,41 +70,55 @@ class Pow(Expr):
             res = Const(n) * (self.left ** Const(n-1)) * ld
             return res, ls + [f"幂链式法则: $d(u^{{{n}}}) = {n}u^{{{n-1}}} \\cdot du$"]
         return Const(0), ["目前仅支持常数幂求导"]
-    def eval(self, env): return self.left.eval(env) ** self.right.eval(env)
-    def __str__(self): return f"({self.left})^{{{self.right}}}"
+    def eval(self, env):
+        return self.left.eval(env) ** self.right.eval(env)
+    def __str__(self):
+        return f"({self.left})^{{{self.right}}}"
 
 class Exp(Expr):
     def __init__(self, inner): self.inner = inner
+
     def deriv(self, var):
-        id_res, id_steps = self.inner.deriv(var)
-        res = exp(self.inner) * id_res
-        return res, id_steps + [f"指数规则: $d(e^{{{self.inner}}}) = e^{{{self.inner}}} \\cdot d({self.inner})$"]
-    def eval(self, env): return math.exp(self.inner.eval(env))
-    def __str__(self): return f"e^{{{self.inner}}}"
+        id, is_ = self.inner.deriv(var)
+        res = exp(self.inner) * id
+        [span_14](start_span);
+        return res, is_ + [f"指数规则: $d(e^{{{self.inner}}}) = e^{{{self.inner}}} \\cdot d({self.inner})$"][span_14](
+            end_span)
 
 def exp(x): return Exp(_to_expr(x))
 
 class Ln(Expr):
     def __init__(self, inner): self.inner = inner
+
     def deriv(self, var):
-        id_res, id_steps = self.inner.deriv(var)
-        res = id_res / self.inner
-        return res, id_steps + [f"对数链式法则: $d(\\ln({self.inner})) = \\frac{{1}}{{{self.inner}}} \\cdot d({self.inner}) = {res}$"]
-    def eval(self, env): return math.log(self.inner.eval(env))
-    def __str__(self): return f"\\ln({self.inner})"
+        id, is_ = self.inner.deriv(var)
+        res = id / self.inner
+        [span_16](start_span);
+        return res, is_ + [
+            f"对数链式法则: $d(\\ln({self.inner})) = \\frac{{1}}{{{self.inner}}} \\cdot d({self.inner}) = {res}$"][
+            span_16](end_span)
+
 
 class Div(Expr):
-    def __init__(self, left, right): self.left, self.right = left, right
+    def __init__(self, left, right):
+        self.left, self.right = left, right
+
     def deriv(self, var):
+        # 1. 递归求子项导数
         ld, ls = self.left.deriv(var)
         rd, rs = self.right.deriv(var)
-        # 修复：利用新增的 __sub__ 方法，直接写减法，代码更清晰
-        res = (ld * self.right - self.left * rd) / (self.right * self.right)
-        return res, ls + rs + [f"商法则: $d({self.left}/{self.right}) = \\frac{{u'v - uv'}}{{v^2}}$"]
-    def eval(self, env): return self.left.eval(env) / self.right.eval(env)
-    def __str__(self): return f"\\frac{{{self.left}}}{{{self.right}}}"
 
-def ln(x): return Ln(_to_expr(x))
+        # 2. 直接使用数学符号计算结果对象 (得益于 Expr 里的 __sub__)
+        res = (ld * self.right - self.left * rd) / (self.right * self.right)
+
+        # 3. 返回结果和步骤列表
+        return res, ls + rs + [f"商法则: $d({self.left}/{self.right}) = \\frac{{u'v - uv'}}{{v^2}}$"]
+
+    def eval(self, env):
+        return self.left.eval(env) / self.right.eval(env)
+
+    def __str__(self):
+        return f"\\frac{{{self.left}}}{{{self.right}}}"
 
 # ==========================================
 # 2. UI 界面设计
